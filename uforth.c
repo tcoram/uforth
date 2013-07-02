@@ -119,7 +119,6 @@ DCELL parse_num(char *s, uint8_t base) {
 */
 CELL find_word(char* s, uint8_t len, DCELL* addr, bool *immediate, bool *prim);
 
-CELL defining_word = 0;		/* are we currently defining a word? */
 void make_word(char *str, uint8_t str_len) {
   CELL my_head = dict_here();
 
@@ -173,6 +172,7 @@ void store_prim(char* str, CELL val) {
 }
 
 typedef uforth_stat (*wfunct_t)(void);
+
 /* Scratch variables for exec */
 static DCELL r1, r2, r3, r4;
 static char *str1, *str2;
@@ -192,11 +192,11 @@ CELL uforth_make_task (DCELL uram,
   u->didx = -1;
   return 1;
 }
-static CELL curtask_idx;
+
 inline void uforth_select_task (CELL uram) {
   uforth_uram = (struct uforth_uram*)
     (uforth_ram + sizeof(struct uforth_iram)+(uram*sizeof(DCELL)));
-  curtask_idx = uram;
+  uforth_iram->curtask_idx = uram;
 }
 
 void uforth_init(void) {
@@ -214,6 +214,7 @@ void uforth_init(void) {
 
 }
 
+/* Bootstrap code */
 void uforth_load_prims(void) {
   dict->here = DICT_HEADER_WORDS+1;
   /*
@@ -316,7 +317,7 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim,uint8_t last_exec_rdix) {
       dpush (0);
       break;
     case URAM_BASE_ADDR:
-      dpush((sizeof(struct uforth_iram)) + curtask_idx);
+      dpush((sizeof(struct uforth_iram)) + uforth_iram->curtask_idx);
       break;
     case SKIP_IF_ZERO:
       r1 = dpop(); r2 = dpop();
@@ -516,7 +517,7 @@ uforth_stat exec(CELL wd_idx, bool toplevelprim,uint8_t last_exec_rdix) {
       if (cmd == _CREATE) {
 	dict_end_def();
       } else {
-	defining_word = dict_here();
+	uforth_iram->compiling_word = dict_here();
       }
       break;
     case COMMA:
@@ -635,11 +636,7 @@ uforth_stat uforth_interpret(char *str) {
 	  uforth_abort();
 	  return E_NOT_A_WORD;
 	}
-	if (abs32(num) > (int32_t)MAX_CELL_NUM){
-	  dpush32(num);
-	} else {
-	  dpush(num);
-	}
+	dpush32(num);
       } else {
 	stat = exec(wd_idx,primitive,uforth_uram->ridx-1);
 	if (stat != OK) {
@@ -658,20 +655,14 @@ uforth_stat uforth_interpret(char *str) {
 	  dict_end_def();
 	  return E_NOT_A_WORD;
 	}
-	/* OPTIMIZATION: Only DLIT big numbers */
-	if (num < 0 || abs32(num) > (int32_t)MAX_CELL_NUM){
-	  dict_append(DLIT);
-	  dict_append(((uint32_t)num)>>16);
-	  dict_append(((uint16_t)num)&0xffff);
-	} else {
-	  dict_append(LIT);
-	  dict_append(num);
-	}
+	dict_append(DLIT);
+	dict_append(((uint32_t)num)>>16);
+	dict_append(((uint16_t)num)&0xffff);
       }	else if (word[0] == ';') { /* exit from a colon def */
 	uforth_iram->compiling = 0;
 	dict_append(EXIT);
 	dict_end_def();
-	defining_word = 0;
+	uforth_iram->compiling_word = 0;
       } else if (immediate) {	/* run immediate word */
 	stat = exec(wd_idx,primitive,uforth_uram->ridx-1);
 	if (stat != OK) {
@@ -687,7 +678,7 @@ uforth_stat uforth_interpret(char *str) {
 	} else {
 	  /* OPTIMIZATION: skip null definitions */
 	  if (uforth_dict[wd_idx] != EXIT) {
-	    if (wd_idx == defining_word) { 
+	    if (wd_idx == uforth_iram->compiling_word) { 
 	      /* Natural recursion for such a small language is dangerous.
 		 However, tail recursion is quite useful for getting rid
 		 of BEGIN AGAIN/UNTIL/WHILE-REPEAT and DO LOOP in some
@@ -695,7 +686,7 @@ uforth_stat uforth_interpret(char *str) {
 		 tail call, but we treat it as such.
 	      */
 	      dict_append(LIT);
-	      dict_append(defining_word);
+	      dict_append(uforth_iram->compiling_word);
 	      dict_append(JMP);
 	    } else {
 	      dict_append(wd_idx);

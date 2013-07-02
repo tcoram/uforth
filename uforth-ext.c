@@ -2,7 +2,6 @@
 #include "uforth.h"
 #include "uforth-config.h"
 #include "uforth-ext.h"
-#include <time.h>
 
 /* 
    Convenience function to convert 32 bit integers to strings.
@@ -17,7 +16,7 @@ void c_ext_create_cmds(void) {
 }
 
 /*
-  All extended commands are handled here.  This is a really long
+  All extended commands are handled here.  This can be a really long
   switch statement. It could be made shorter by making the contents function
   calls but (outside of a good optimizer) this would incur additional overhead.
   We want to be as fast as possible.

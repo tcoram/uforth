@@ -4,50 +4,76 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <sys/time.h>
+#include "stm32f4xx_conf.h"
 #include "uforth.h"
 #include "uforth-ext.h"
 
 #include "uforth.img.h"
-struct timeval start_tv;
 
 
  	
 /* A static variable for holding the line. */
 static char line_read[128];
 
-/* Read a string, and return a pointer to it.
-   Returns NULL on EOF. */
-char * rl_gets () {
-  fgets(line_read,128,stdin);
-  return line_read;
+
+char rxc(){
+  while (USART_GetFlagStatus(USART3, USART_FLAG_RXNE) == RESET);
+  return (USART_ReceiveData(USART3));
 }
 
 void txc(uint8_t c) {
-  fputc(c, stdout);
-  fflush(stdout);
+  USART_SendData(USART3, c);
+  while (USART_GetFlagStatus(USART3, USART_FLAG_TC) == RESET);
 }
-
 void txs(char* s, int cnt) {
-  fwrite(s,cnt,1,stdout);
-  fflush(stdout);
+  int i;
+  
+  for(i = 0;i < cnt;i++) {
+    txc((uint8_t)s[i]);
+  }
 }
 #define txs0(s) txs(s,strlen(s))
 
-static char linebuf[128];
+/* Read a string, and return a pointer to it.
+   Returns NULL on EOF. */
+char * rl_gets () {
+  int i = 0;
+  char c;
+  while (i < 128) {
+    c = rxc();
+    txc(c);
+    switch(c) {
+    case 3:
+      txs0(" ^C\n");
+      line_read[0] = '\0';
+      return line_read;
+      break;
+    case '\r':
+      line_read[i] = '\0';
+      txc('\n');
+      return line_read;
+    case 8:
+      if (i > 0) i--;
+      break;
+    default:
+      line_read[i++] = c;
+      break;
+    }
+  }
+  line_read[127] = 0;
+  return line_read;
+}
+
+
 char *line;
-void interpret_from(FILE *fp) {
+void interpret_from() {
   int stat;
   int16_t lineno = 0;
-  while (!feof(fp)) {
+  while (1) {
     ++lineno;
-    if (fp == stdin) txs0(" ok\r\n");
-    if (fp == stdin) {
-      line=rl_gets(); if (line==NULL) exit(0);
-    } else {
-      if (fgets(linebuf,128,fp) == NULL) break;
-      line = linebuf;
-    }
-    if (line[0] == '\n' || line[0] == '\0') continue;
+    txs0(" ok\r\n");
+    line=rl_gets(); // if (line==NULL) exit(0);
+    if (line[0] == '\r' || line[0] == '\0') continue;
     stat = uforth_interpret(line);
     switch(stat) {
     case E_NOT_A_WORD:
@@ -119,13 +145,14 @@ uforth_stat c_handle(void) {
   return OK;
 }
 
-const struct dict  *dict = &flashdict;
+struct dict  *dict = &flashdict;
 
-void main() {
+void uforth_main() {
   uforth_init();
 
   c_ext_init();
   uforth_interpret("init");
+  uforth_interpret("cr memory cr");
   interpret_from(stdin);
 }
 

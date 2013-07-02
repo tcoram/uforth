@@ -34,12 +34,21 @@
 #define UFORTH_VERSION "1.2"
 #define DICT_VERSION 0006
 
+/*
+ Note: A Dictionary CELL is 2 bytes.
+*/
+typedef uint16_t CELL;
+
+/*
+  Data cell size is 32 bits
+*/
+typedef int32_t DCELL;
+
 typedef char bool;
 typedef enum { OK=0, E_NOT_A_WORD, E_STACK_UNDERFLOW, E_RSTACK_OVERFLOW,
 	       E_DSTACK_OVERFLOW, E_ABORT, E_EXIT } uforth_stat;
 
 #define BYTES_PER_CELL sizeof(CELL)
-#define MAX_CELL_NUM 32767
 
 /*
  The following structures are overlays on pre-allocated buffers.
@@ -51,6 +60,8 @@ typedef enum { OK=0, E_NOT_A_WORD, E_STACK_UNDERFLOW, E_RSTACK_OVERFLOW,
 struct uforth_iram {
   DCELL compiling;		/* 0=interpreting, 1=colondef, 2=compiling */
   DCELL total_ram;		/* Total ram available */
+  DCELL compiling_word;	 /* 0=none */
+  DCELL curtask_idx;
   DCELL tibidx;
   DCELL tibclen;
   DCELL tibwordidx;		/* point to current word in inbufptr */
@@ -75,7 +86,7 @@ struct dict {
   CELL here;			/* top of dictionary */
   CELL last_word_idx;		/* top word's code token (used for searches) */
   CELL varidx;			/* keep track of next variable slot (neg #) */
-  CELL d[0];	/* dictionary */
+  CELL d[MAX_DICT_CELLS];	/* dictionary */
 };
 #define DICT_HEADER_WORDS	5 /* version + max_cells + here + .. */
 #define DICT_INFO_SIZE_BYTES	(sizeof(CELL)*DICT_HEADER_WORDS)
@@ -103,21 +114,20 @@ extern abort_t _uforth_abort_request;
 char* uforth_count_str(CELL addr,CELL* new_addr);
 
 /*
- RAM dictionaries don't need to do anything special for dictionary
- entry creation.
+ All dictionary writing/updating is captured here.
 */
-#ifndef RAM_DICT
-CELL dict_here(void);
-void dict_load_cache(void);
-void dict_start_def(void);
-void dict_end_def(void);
-void dict_write(CELL idx, CELL cell);
-void dict_set_last_word(CELL cell);
-CELL dict_incr_varidx(CELL n);
-CELL dict_incr_here(CELL cnt);
-void dict_append(CELL cell);
-void dict_append_string(char* src,CELL len);
-#endif
+# define dict_start_def()
+# define dict_here() dict->here
+# define dict_set_last_word(cell) dict->last_word_idx=cell
+# define dict_incr_varidx(n) (dict->varidx += n)
+# define dict_incr_here(n) dict->here += n
+# define dict_append(cell) uforth_dict[dict->here] = cell, dict_incr_here(1)
+# define dict_write(idx,cell) uforth_dict[idx] = cell
+# define dict_append_string(src,len) { \
+    strncpy((char*)((uforth_dict )+(dict->here)),src,len);			\
+    dict->here += (len/BYTES_PER_CELL) + (len % BYTES_PER_CELL); \
+}
+# define dict_end_def()
 
 
 INLINE void dpush(const DCELL w);

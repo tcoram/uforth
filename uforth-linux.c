@@ -125,13 +125,31 @@ uforth_stat c_handle(void) {
     break;
   case UF_SAVE_IMAGE:			/* save image */
     {
+      int dict_size= (dict_here())*sizeof(CELL);
       char *s = uforth_next_word();
       strncpy(buf, s, uforth_iram->tibwordlen+1);
       buf[(uforth_iram->tibwordlen)+1] = '\0';
-      printf("Saving dictionary into %s\n", buf);
+      printf("Saving raw dictionary into %s\n", buf);
       fp = fopen(buf, "w+");
       fprintf(fp,"%ld\n",(int)(dict_here())*sizeof(CELL));
-      fwrite(dict, (dict_here())*sizeof(CELL) ,1,fp);
+      fwrite(dict, dict_size,1,fp);
+      fclose(fp);
+
+      char *hfile = malloc(strlen(buf) + 3);
+      strcpy(hfile,buf);
+      strcat(hfile,".h");
+      printf("Saving raw dictionary into %s\n", hfile);
+      fp = fopen(hfile,"w");
+      free(hfile);
+      fprintf(fp,"struct dict flashdict = {%d,%d,%d,%d,%d,{\n",
+	      dict->version,dict->max_cells,dict->here,dict->last_word_idx,
+	      dict->varidx);
+      int i;
+      for(i = 0; i < dict_size-1; i++) {
+	fprintf(fp, "0x%0X,",dict->d[i]);
+      }
+      fprintf(fp, "%0X",dict->d[dict_size-1]);
+      fprintf(fp,"\n}};\n");
       fclose(fp);
     }
     break;

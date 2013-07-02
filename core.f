@@ -53,6 +53,7 @@
 : iram ram 0 + ;
 : compiling? ( -- flag) 0 iram + @  ;
 : ramsize ( -- flag) 1 iram + @  ;
+: compiling-word-addr ( -- addr) 2 iram + @ ;
 
 : uram-size ( -- uram_length) uram 0 + @  ;
 : base ( -- base_addr) uram 1 +  ;

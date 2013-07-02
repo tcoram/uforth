@@ -1,18 +1,24 @@
 CC=gcc
-CFLAGS=-Wall -g -DRAM_DICT -DPC_SIM -lm
+CFLAGS=-Wall -g -lm
 LDFLAGS= -g -lm
-# CFLAGS=-Wall -O2 -DRAM_DICT -DPC_SIM -lm
 # LDFLAGS= -O2 -lm
 
 SRCS=	uforth.c  uforth-ext.c  utils.c 
 HDRS= uforth.h uforth-ext.h
-OBJS= $(SRCS:.c=.o)
+OBJS= uforth-ext.o uforth.o utils.o
 
 TARGET=uforth-linux
 
-uforth: $(OBJS) $(TARGET).o  ext.f
-	gcc $(CFLAGS) -o uforth $(OBJS) $(TARGET).o -lreadline -lm
-	echo "save-image uforth.img" | ./uforth 
+uforth-linux: $(OBJS) uforth-linux.o  ext.f
+	$(CC) $(CFLAGS) -o uforth-linux $(OBJS) uforth-linux.o -lreadline -lm
+	echo "save-image uforth.img" | ./uforth-linux
+
+dict:
+	echo 'save-image uforth.img' | ./uforth-linux
+
+uforth-stm32: dict $(OBJS) uforth-stm32.o ext.f
+	$(CC) -o uforth-stm32 $(OBJS) uforth-stm32.o
+
 
 ext.f: uforth-ext.h
 	awk -f make_ext_words.awk uforth-ext.h > ext.f
