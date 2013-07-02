@@ -1,15 +1,123 @@
-#include <stdio.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
-#include <sys/time.h>
 #include "stm32f4xx_conf.h"
+#include "utils.h"
+
 #include "uforth.h"
 #include "uforth-ext.h"
 
 #include "uforth.img.h"
 
+
+void init();
+
+void uforth_main();
+
+int main(void) {
+  init();
+  uforth_main();
+  return 0;
+}
+
+
+/*
+ * Called from systick handler
+ */
+volatile uint32_t time_var1, time_var2;
+void timing_handler() {
+	if (time_var1) {
+		time_var1--;
+	}
+
+	time_var2++;
+}
+
+void init() {
+	GPIO_InitTypeDef  GPIO_InitStructure;
+	USART_InitTypeDef USART_InitStructure;
+	DAC_InitTypeDef  DAC_InitStructure;
+
+	// ---------- SysTick timer -------- //
+	if (SysTick_Config(SystemCoreClock / 1000)) {
+		// Capture error
+		while (1){};
+	}
+
+	// GPIOD Periph clock enable
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+
+	// Configure PD12, PD13, PD14 and PD15 in output pushpull mode
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12 | GPIO_Pin_13| GPIO_Pin_14| GPIO_Pin_15;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOD, &GPIO_InitStructure);
+
+
+	// ------ UART ------ //
+
+	// Clock
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+
+	GPIO_PinAFConfig(GPIOD, GPIO_PinSource8, GPIO_AF_USART3);
+	GPIO_PinAFConfig(GPIOD, GPIO_PinSource9, GPIO_AF_USART3);
+
+	// IO
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8 | GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOD, &GPIO_InitStructure);
+
+
+	// Conf
+	USART_InitStructure.USART_BaudRate = 115200;
+	USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+	USART_InitStructure.USART_StopBits = USART_StopBits_1;
+	USART_InitStructure.USART_Parity = USART_Parity_No;
+	USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	USART_InitStructure.USART_Mode = USART_Mode_Tx | USART_Mode_Rx;
+	USART_Init(USART3, &USART_InitStructure);
+
+	// Enable
+	USART_Cmd(USART3, ENABLE);
+
+
+	// ---------- DAC ---------- //
+
+	// Clock
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+
+	// Configuration
+	DAC_InitStructure.DAC_Trigger = DAC_Trigger_None;
+	DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
+	DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
+	DAC_Init(DAC_Channel_1, &DAC_InitStructure);
+
+	// IO
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	// Enable DAC Channel1
+	DAC_Cmd(DAC_Channel_1, ENABLE);
+
+	// Set DAC Channel1 DHR12L register
+	DAC_SetChannel1Data(DAC_Align_12b_R, 0);
+}
+
+/*
+ * Dummy function to avoid compiler error
+ */
+void _init() {
+
+}
 
  	
 /* A static variable for holding the line. */
@@ -66,7 +174,7 @@ char * rl_gets () {
 
 
 char *line;
-void interpret_from() {
+void repl() {
   int stat;
   int16_t lineno = 0;
   while (1) {
@@ -77,7 +185,6 @@ void interpret_from() {
     stat = uforth_interpret(line);
     switch(stat) {
     case E_NOT_A_WORD:
-      fprintf(stdout," line: %d: ", lineno);
       txs0("Huh? >>> ");
       txs(&uforth_iram->tib[uforth_iram->tibwordidx],uforth_iram->tibwordlen);
       txs0(" <<< ");
@@ -108,7 +215,7 @@ void interpret_from() {
 }
 
 uforth_stat c_handle(void) {
-  DCELL r2, r1 = dpop();
+  DCELL r1 = dpop();
 
   switch(r1) {
   case UF_MS:		/* milliseconds */
@@ -124,18 +231,10 @@ uforth_stat c_handle(void) {
     break;
   case UF_READB:
     {
-      char b;
-      r2=dpop();
-      read(r2,&b,1);
-      dpush(b);
     }
     break;
   case UF_WRITEB:
     {
-      char b;
-      r2=dpop();
-      b=dpop();
-      dpush(write(r2,&b,1));
     }
     break;
 
@@ -153,6 +252,6 @@ void uforth_main() {
   c_ext_init();
   uforth_interpret("init");
   uforth_interpret("cr memory cr");
-  interpret_from(stdin);
+  repl();
 }
 
