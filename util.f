@@ -133,13 +133,13 @@
     maxdict . ."  cells."
     ."  (" here 100 * maxdict / . ." % used)." cr
     9 emit
-    ." System RAM : " ramsize . ."  cells (" ramsize 4 * . ."  bytes)" cr
+    ." System RAM : " ramsize . ."  cells (" ramsize wordsize * . ."  bytes)" cr
     9 emit
     ." Task Data Stack: " dslen . ."  cells. " 
     ." Task Return Stack: " rslen . ."  cells."  cr
     9 emit
     ." Task RAM: " uram-top@ .
-    ."  cells (" uram-top@ 4 * . ."  bytes) used out of " uram-size .
+    ."  cells (" uram-top@ wordsize * . ."  bytes) used out of " uram-size .
     ."  cells" cr ;
 
 
@@ -184,3 +184,22 @@ variable _cc			\ keep track of # of characters on a line
     dict-count 0 do dup i +dict-c@ pad c!+ loop ;
 
 : test-loop ." looping 2 million times..." ms  2000000 0 do i drop loop ms  swap - ."  in "  . ."  mseconds." cr ;
+
+: ?dup   dup 0= if drop then ;
+: is-immediate? ( addr -- addr flag)
+    dup 1+ 128 and ;
+
+: repl
+    begin
+	." ok" cr
+	next-word (find)
+	compiling? not if
+	    ?dup if exec else >num then
+	else
+	    ?dup if is-immediate? if exec else , then
+	    else [compile] lit ,
+	    then
+	then
+    again ;
+
+: foo ." foo " cr ;

@@ -12,3 +12,5 @@
 : inb ( fd -- c )   10 cf ;
 : outb ( c fd -- )   11 cf ;
 : ms ( -- milliseconds )   12 cf ;
+: dlsym ( <word> -- addr)   13 cf ;
+: dlffi ( p1..p4 addr -- res)   14 cf ;

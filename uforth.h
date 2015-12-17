@@ -37,12 +37,13 @@
 /*
  Note: A Dictionary CELL is 2 bytes.
 */
-typedef uint16_t CELL;
+ typedef uint16_t CELL;
 
 /*
   Data cell size is 32 bits
 */
-typedef int32_t DCELL;
+// typedef int32_t DCELL;
+typedef int64_t DCELL;
 
 typedef char bool;
 typedef enum { OK=0, E_NOT_A_WORD, E_STACK_UNDERFLOW, E_RSTACK_OVERFLOW,
@@ -82,6 +83,7 @@ struct uforth_uram {
 
 struct dict {
   CELL version;			/* dictionary version number */
+  CELL word_size;		/* size of native word */
   CELL max_cells;		/* MAX_DICT_CELLS */
   CELL here;			/* top of dictionary */
   CELL last_word_idx;		/* top word's code token (used for searches) */

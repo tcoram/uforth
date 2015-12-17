@@ -193,7 +193,7 @@ CELL uforth_make_task (DCELL uram,
   return 1;
 }
 
-inline void uforth_select_task (CELL uram) {
+void uforth_select_task (CELL uram) {
   uforth_uram = (struct uforth_uram*)
     (uforth_ram + sizeof(struct uforth_iram)+(uram*sizeof(DCELL)));
   uforth_iram->curtask_idx = uram;

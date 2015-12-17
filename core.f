@@ -41,10 +41,11 @@
 \ Low level dictionary access.
 \
 : dversion 0 dict@ ;
-: maxdict 1 dict@ ;
-: _here 2 ;
-: lwa 3 ;
-: uram-top@ ( -- n) 4 dict@ ;
+: wordsize 1 dict@ ;
+: maxdict 2 dict@ ;
+: _here 3 ;
+: lwa 4 ;
+: uram-top@ ( -- n) 5 dict@ ;
 
 
 \ Low level memory access. This is tightly bound to the uforth implementation

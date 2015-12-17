@@ -13,4 +13,6 @@
 #define UF_READB		10	// inb ( fd -- c )
 #define UF_WRITEB		11	// outb ( c fd -- )
 #define UF_MS		        12	// ms ( -- milliseconds )
+#define UF_DLSYM		13	// dlsym ( <word> -- addr)
+#define UF_DLFFI		14	// dlffi ( p1..p4 addr -- res)
 #endif	/* UF_UFORTH_EXT_H */

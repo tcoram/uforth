@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define INLINE inline
+#define INLINE
 
 /* 
    The Dictionary: Max is 64K words (64KB * 2)

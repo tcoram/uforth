@@ -1,6 +1,6 @@
 CC=gcc
-CFLAGS=-Wall -g -lm
-LDFLAGS= -g -lm
+CFLAGS=-Wall -g -lm -rdynamic -DINLINE
+LDFLAGS= -g -lm -ldl
 # LDFLAGS= -O2 -lm
 
 SRCS=	uforth.c  uforth-ext.c  utils.c 
@@ -10,7 +10,7 @@ OBJS= uforth-ext.o uforth.o utils.o
 TARGET=uforth-linux
 
 uforth-linux: $(OBJS) uforth-linux.o  ext.f
-	$(CC) $(CFLAGS) -o uforth-linux $(OBJS) uforth-linux.o -lreadline -lm
+	$(CC) $(CFLAGS) -o uforth-linux $(OBJS) uforth-linux.o $(LDFLAGS) -lreadline -lm
 	echo "save-image uforth.img" | ./uforth-linux
 
 dict:

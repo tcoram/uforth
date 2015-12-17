@@ -100,6 +100,8 @@ bool config_close(void) {
 
 void interpret_from(FILE *fp);
 
+#include <dlfcn.h>
+void *dlhand;
 
 uforth_stat c_handle(void) {
   DCELL r2, r1 = dpop();
@@ -107,6 +109,41 @@ uforth_stat c_handle(void) {
   static char buf[80*2];
 
   switch(r1) {
+  case UF_DLFFI:
+    {
+      typedef DCELL (*arbitrary)();
+      arbitrary my_function;
+      *(DCELL*)(&my_function) = dpop();
+      DCELL pcnt;
+      pcnt = dpop();		/* parameter count */
+      switch (pcnt) {
+      case 1:
+	dpush(my_function(dpop()));
+	break;
+      case 2:
+	dpush(my_function(dpop(),dpop()));
+	break;
+      case 3:
+	dpush(my_function(dpop(),dpop(),dpop()));
+	break;
+      case 4:
+	dpush(my_function(dpop(),dpop(),dpop(),dpop()));
+	break;
+      case 5:
+	dpush(my_function(dpop(),dpop(),dpop(),dpop()));
+	break;
+      }
+    }
+    break;
+  case UF_DLSYM:	
+    {
+      char *s = uforth_next_word();
+      strncpy(buf, s, uforth_iram->tibwordlen+1);
+      buf[(uforth_iram->tibwordlen)+1] = '\0';
+      r2 = (DCELL)dlsym(dlhand,buf);
+      dpush(r2);
+    }
+    break;
   case UF_MS:		/* milliseconds */
     {
       struct timeval tv;
@@ -263,12 +300,15 @@ int main(int argc, char* argv[]) {
 
   dict = malloc(sizeof(CELL)*MAX_DICT_CELLS) + sizeof(struct dict);
   dict->version = DICT_VERSION;
+  dict->word_size = sizeof(uint64_t);
   dict->max_cells = MAX_DICT_CELLS;
   dict->here =  0;
   dict->last_word_idx = 0;
   dict->varidx = 1;
 
   gettimeofday(&start_tv,0);
+
+  dlhand = dlopen(NULL, RTLD_NOW);
 
   uforth_init();
 
